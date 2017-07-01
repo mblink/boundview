@@ -1,0 +1,16 @@
+/RUNNING_PID
+/logs/
+/project/*-shim.sbt
+/project/project/
+/project/target/
+/target/
+/core/logs/
+/core/project/*-shim.sbt
+/core/project/project/
+/core/project/target/
+/core/target/
+/example/logs/
+/example/project/*-shim.sbt
+/example/project/project/
+/example/project/target/
+/example/target/
