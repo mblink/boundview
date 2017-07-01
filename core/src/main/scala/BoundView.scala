@@ -19,27 +19,27 @@ object boundview {
   case object MissingElement extends DomError
   case object ValueTypeError extends DomError
 
-  case class Binding[I, A](sel: String, ev: Trigger, upd: (I, A) => A)
+  case class Binding[I, A](sel: String, ev: Trigger, upd: (() => \/[DomError, I], A) => \/[DomError, A])
   case class DomBinding[I, A](
     binding: Binding[I, A],
-    read: String => \/[DomError, I],
-    bind: String => Trigger => (A => A) => Unit)
+    read: String => () => \/[DomError, I],
+    bind: String => Trigger => (A => \/[DomError, A]) => Unit)
 
-  case class CustomReader[I](read: String => \/[DomError, I])
+  case class CustomReader[I](read: String => () => \/[DomError, I])
 
   trait LPRD extends Poly1 {
     implicit def readIAFromString[I: Typeable, K <: Symbol, A](implicit
-        readString: String => \/[DomError, String],
-        binder: String => Trigger => (A => A) => Unit) =
+        readString: String => () => \/[DomError, String],
+        binder: String => Trigger => (A => \/[DomError, A]) => Unit) =
       at[FieldType[K, Binding[I, A]]] {
-        (bind) => field[K](DomBinding(bind, readString.map(_.flatMap(_.cast[I] \/> ValueTypeError)), binder)) }
+        (bind) => field[K](DomBinding(bind, readString.map(_.map(_.flatMap(_.cast[I] \/> ValueTypeError))), binder)) }
   }
 
   object ReadFromDom extends LPRD {
     implicit def readHNil = at[HNil](identity[HNil])
     implicit def readIACustom[I, K <: Symbol, A](implicit
         reader: CustomReader[I],
-        binder: String => Trigger => (A => A) => Unit) =
+        binder: String => Trigger => (A => \/[DomError, A]) => Unit) =
       at[FieldType[K, Binding[I, A]]] {
         (bind) => field[K](DomBinding(bind, reader.read, binder)) }
   }
@@ -47,8 +47,8 @@ object boundview {
   object BindToDom extends Poly1 {
     implicit def bindHNil = at[HNil](identity[HNil])
     implicit def bindIA[K <: Symbol, I, A] = at[FieldType[K, DomBinding[I, A]]] {
-      (bind) => field[K](bind.read(bind.binding.sel)
-                    .map(i => bind.bind(bind.binding.sel)(bind.binding.ev)(bind.binding.upd(i, _)))) }
+      (bind) =>
+        field[K](bind.bind(bind.binding.sel)(bind.binding.ev)(bind.binding.upd(bind.read(bind.binding.sel), _))) }
   }
 
   implicit class DomBinder[H <: HList](h: H) {
